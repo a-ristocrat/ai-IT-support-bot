@@ -1,75 +1,49 @@
-# AI IT Help Desk Bot
+# AI Help Desk Bot
 
-An offline Tier 1 IT support chatbot powered by a local LLM (GLM-4.7-Flash via Ollama).
-It answers **only** from a knowledge base, escalates unresolved issues as tickets,
-and includes a technician panel for ticket management.
+I built this to practice Tier 1 IT support and to learn how to work with a local AI model in Python.
+The bot answers common IT problems using a small knowledge base I wrote, and when it can't help,
+it opens a ticket. There's also a simple panel where a technician can view and close tickets.
 
-No cloud APIs, no subscriptions — all data stays on the local machine.
+Everything runs on my own laptop with Ollama and the GLM-4.7-Flash model. No cloud, no API keys.
 
 ## Demo
 
-**Small talk, then a real issue solved from the knowledge base**
+Small talk, then a Wi-Fi problem solved from the knowledge base:
 
 ![Chat and KB answer](screenshots/chat-and-kb-answer.png)
 
-**Steps didn't help → escalation with user details (new user confirmed)**
+The printer steps didn't help, so the bot asks who the ticket is for and opens one:
 
 ![Escalation](screenshots/escalation-new-user.png)
 
-**Server outage → no article fits → Critical ticket created immediately**
+A server outage has no matching article, so it goes straight to a Critical ticket:
 
 ![Critical ticket](screenshots/critical-ticket.png)
 
-**Tickets saved with category and priority**
+What the saved tickets look like:
 
 ![tickets.csv](screenshots/tickets-csv.png)
 
-## Features
+## What it does
 
-- **Knowledge-base answers only** — troubleshooting steps come from `kb/*.md` articles, not the model's guesses
-- **Code-level routing + verification** — one LLM call picks an article, a second checks it really fits; if not, a ticket is created
-- **Ticket lifecycle** — steps → "Did this solve your problem?" → resolve or escalate
-- **AI ticket classification** — category (Hardware / Software / Network / Account / Security / Other) and priority (Critical / High / Medium / Low)
-- **User details** — name and department (reused only after confirmation) and the device for each ticket
-- **Personality** — off-topic messages get a short, witty reply from "Byte" and a nudge back to IT, without creating tickets
-- **Technician panel** (`admin.py`) — view tickets by urgency, filter, close, and see statistics
-- **Safety rules** — never asks for passwords; off-topic messages get a polite redirect, not a ticket
+- Answers only from the articles in the `kb` folder (printer, Wi-Fi, VPN, Outlook, passwords)
+- Asks "Did this solve your problem?" after giving steps. If not, it opens a ticket.
+- Asks for name, department, and device before creating a ticket
+- Uses the AI to pick a category and priority for each ticket
+- Never asks for passwords
+- Has a bit of personality for off-topic messages, but doesn't open tickets for them
+- `admin.py` lets a technician see tickets sorted by priority, filter them, close them, and see basic stats
 
 ## How it works
 
-```
-User message
-    │
-    ▼
-Router (LLM) ── off-topic ──► friendly reply
-    │
-    ├── no article ──────────────────────────┐
-    ▼                                        │
-Verifier (LLM) ── article doesn't fit ───────┤
-    │                                        ▼
-    ▼                              Collect user info
-Steps from KB article                        │
-    │                                        ▼
-    ▼                         Classify (category + priority)
-"Did this solve it?" ── no ──►               │
-    │                                        ▼
-   yes → resolved                     tickets.csv
-```
+When a message comes in, the bot first asks the model which article fits, or whether the message
+isn't about IT at all. Then it asks the model a second time to double-check that the article really
+matches. Only after both checks pass does it show the steps. If either check fails, the bot creates
+a ticket instead of guessing.
 
-## Project structure
+## Running it
 
-```
-helpdesk-bot/
-├── hdbot.py      # user-facing chatbot
-├── admin.py      # technician panel
-├── kb/           # knowledge base articles (Markdown)
-├── screenshots/  # demo images for this README
-└── tickets.csv   # created automatically (not uploaded)
-```
-
-## How to run
-
-1. Install [Ollama](https://ollama.com/download) and pull the model:
+1. Install [Ollama](https://ollama.com/download) and download the model:
    ```
    ollama pull glm-4.7-flash
    ```
@@ -86,19 +60,43 @@ helpdesk-bot/
    python admin.py
    ```
 
-## Limitations & lessons learned
+## Problems I ran into
 
-- **Prompt rules weren't enough.** The model ignored "answer only from the knowledge base"
-  and invented plausible-sounding steps for issues with no article (hallucination).
-  Fixed by moving the decision into code: the model can only answer after an article is selected and verified.
-- **The model triggered tickets on its own.** When an article said "escalate with a ticket,"
-  the model added the ticket tag immediately. Fixed by removing ticket decisions from the model entirely.
-- **Small models are inconsistent.** The same input sometimes produced `offtopic`, `off-topic`, or `OFFTOPIC.`;
-  output parsing was made tolerant. Temperature is set to 0 for troubleshooting.
-- **The verifier needed tuning.** A strict "exact match" question rejected valid cases;
-  few-shot examples made it accept single-user issues and reject office-wide outages.
-- Runs on 32 GB RAM, CPU-only; each reply takes several seconds because of multiple model calls.
+This was the most useful part of the project.
 
-## Built with
+**The model made things up.** I told it in the prompt to only use my articles, but when I asked
+about a flickering monitor (no article for that), it still gave confident troubleshooting steps.
+Changing the wording and lowering the temperature didn't fully fix it. What worked was taking the
+decision away from the model: the code now checks for a matching article first, and if there isn't
+one, the model never gets to answer.
 
-Python · Ollama · GLM-4.7-Flash · CSV
+**It opened tickets on its own.** One of my articles ends with "escalate with a ticket," and the
+model took that as an instruction and created a ticket right after showing the steps. I removed
+ticket decisions from the model completely. Now only the code creates tickets.
+
+**It picked the wrong article.** With only one article, the model matched almost everything to
+"printer," including an internet outage. Adding more articles and a second "does this really fit?"
+check fixed it. That check also catches office-wide outages, which should go to a technician
+instead of getting single-user steps.
+
+**The answers weren't consistent.** The same message sometimes came back as `offtopic`,
+`off-topic`, or `OFFTOPIC.`, so I had to make the code more forgiving when reading the answer.
+
+It's not perfect. It's a small model running on a 32 GB laptop without a GPU, so replies take a few
+seconds and it still slips sometimes.
+
+## Files
+
+```
+helpdesk-bot/
+├── hdbot.py      # the chatbot
+├── admin.py      # technician panel
+├── kb/           # knowledge base articles
+├── screenshots/
+└── tickets.csv   # created when the first ticket is opened
+```
+
+## What I'd add next
+
+- A web interface instead of the terminal
+- Connecting it to my Active Directory lab so it can actually unlock accounts and reset passwords
