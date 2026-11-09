@@ -82,8 +82,7 @@ instead of getting single-user steps.
 **The answers weren't consistent.** The same message sometimes came back as `offtopic`,
 `off-topic`, or `OFFTOPIC.`, so I had to make the code more forgiving when reading the answer.
 
-It's not perfect. It's a small model running on a 32 GB laptop without a GPU, so replies take a few
-seconds and it still slips sometimes.
+It's not perfect. It's a small model running on a 32 GB laptop, so replies take a few seconds and it still slips sometimes.
 
 ## Files
 
